@@ -293,7 +293,7 @@ const RetailerDashboard = () => {
                                         {!collapsedSections.pending && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                                 {orders.filter(o => o.status === 'Pending').map(order => (
-                                                    <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} />
+                                                    <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} user={user} />
                                                 ))}
                                                 {orders.filter(o => o.status === 'Pending').length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontStyle: 'italic', paddingLeft: '1rem' }}>No pending orders.</div>}
                                             </div>
@@ -314,7 +314,7 @@ const RetailerDashboard = () => {
                                         {!collapsedSections.approved && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                                 {orders.filter(o => (o.status === 'Approved' || o.status === 'Processing')).map(order => (
-                                                    <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} />
+                                                    <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} user={user} />
                                                 ))}
                                                 {orders.filter(o => (o.status === 'Approved' || o.status === 'Processing')).length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontStyle: 'italic', paddingLeft: '1rem' }}>No approved orders.</div>}
                                             </div>
@@ -335,7 +335,7 @@ const RetailerDashboard = () => {
                                         {!collapsedSections.delivered && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                                 {orders.filter(o => o.status === 'Delivered').map(order => (
-                                                    <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} />
+                                                    <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} user={user} />
                                                 ))}
                                                 {orders.filter(o => o.status === 'Delivered').length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontStyle: 'italic', paddingLeft: '1rem' }}>No delivered orders.</div>}
                                             </div>
@@ -382,7 +382,7 @@ const RetailerDashboard = () => {
     );
 };
 
-const OrderHistoryCard = ({ order, expandedOrderId, setExpandedOrderId }) => (
+const OrderHistoryCard = ({ order, expandedOrderId, setExpandedOrderId, user }) => (
     <div key={order.orderId} className="glass-card" style={{ padding: '1.5rem', background: 'white' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
@@ -406,44 +406,6 @@ const OrderHistoryCard = ({ order, expandedOrderId, setExpandedOrderId }) => (
 
         {expandedOrderId === order.orderId && (
             <>
-                {/* Dynamic Timeline */}
-                {order.status === 'Rejected' ? (
-                    <div style={{ textAlign: 'center', padding: '1rem', background: '#fee2e2', borderRadius: '8px', color: '#991b1b', margin: '1rem 0', fontWeight: '600' }}>
-                        Order Rejected - Please contact support for details.
-                    </div>
-                ) : (
-                    <div className="timeline-container" style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', margin: '2rem 0' }}>
-                        <div style={{ position: 'absolute', top: '15px', left: '0', right: '0', height: '2.5px', background: '#e2e8f0', zIndex: 0 }}></div>
-                        {['Pending', 'Approved', 'Delivered'].map((step, idx) => {
-                            const steps = ['Pending', 'Approved', 'Delivered'];
-                            const currentIdx = steps.indexOf(order.status);
-                            const isCompleted = currentIdx >= idx;
-
-                            return (
-                                <div key={step} style={{ position: 'relative', zIndex: 1, textAlign: 'center', flex: 1 }}>
-                                    <div style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '50%',
-                                        background: isCompleted ? 'var(--success)' : 'white',
-                                        border: `2px solid ${isCompleted ? 'var(--success)' : '#cbd5e1'}`,
-                                        margin: '0 auto',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: isCompleted ? 'white' : '#94a3b8',
-                                        boxShadow: isCompleted ? '0 0 10px rgba(16, 185, 129, 0.3)' : 'none',
-                                        transition: 'all 0.3s ease'
-                                    }}>
-                                        {isCompleted ? <CheckCircle size={18} /> : <span>{idx + 1}</span>}
-                                    </div>
-                                    <div style={{ fontSize: '0.7rem', fontWeight: '700', marginTop: '0.75rem', color: isCompleted ? 'var(--text-dark)' : '#cbd5e1' }}>{step}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
                 <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px' }}>
                     <h4 style={{ fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--secondary)' }}>Ordered Items</h4>
                     {order.items.map((item, i) => (
