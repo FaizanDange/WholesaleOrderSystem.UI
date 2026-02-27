@@ -145,6 +145,20 @@ const RetailerDashboard = () => {
         </>
     );
 
+    const renderOrderHistoryCard = (order) => (
+        <div key={order.orderId} className="order-card">
+            <h3>Order #{order.orderId}</h3>
+            <p>Status: {order.status}</p>
+            <button
+                onClick={() => downloadOrderPDF(order, user?.name)}
+                className="btn btn-primary"
+                style={{ marginTop: '1.5rem', width: '100%', justifyContent: 'center', background: '#334155' }}
+            >
+                <Download size={18} /> Download Items List
+            </button>
+        </div>
+    );
+
     return (
         <div className="dashboard-layout">
             {/* Sidebar */}
