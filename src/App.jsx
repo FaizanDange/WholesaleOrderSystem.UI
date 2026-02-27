@@ -79,7 +79,7 @@ function AppRoutes() {
 
 function App() {
   return (
-    <Router basename='https://wholesale-order-system-ui.vercel.app/'>
+    <Router>
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
