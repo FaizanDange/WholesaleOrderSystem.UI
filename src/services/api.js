@@ -4,8 +4,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
+    // Do not set a global Content-Type here so requests that use FormData
+    // can let the browser/axios set the proper multipart boundary header.
     headers: {
-        'Content-Type': 'application/json',
+        'Accept': 'application/json'
     },
 });
 

@@ -23,8 +23,16 @@ const ChangePassword = () => {
             return;
         }
 
-        if (passwords.newPassword.length < 6) {
-            setStatus({ type: 'error', message: 'Password must be at least 6 characters' });
+        const validatePassword = (pwd) => {
+            if (!pwd) return { valid: false, message: 'Password is required.' };
+            const re = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/; // at least 8 chars, one letter and one number
+            if (!re.test(pwd)) return { valid: false, message: 'Password must be at least 8 characters and include letters and numbers.' };
+            return { valid: true };
+        };
+
+        const pwdValidation = validatePassword(passwords.newPassword);
+        if (!pwdValidation.valid) {
+            setStatus({ type: 'error', message: pwdValidation.message });
             return;
         }
 

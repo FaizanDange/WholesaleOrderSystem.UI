@@ -12,11 +12,23 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
+    const validatePassword = (pwd) => {
+        if (!pwd) return { valid: false, message: 'Password is required.' };
+        const re = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/; // at least 8 chars, 1 letter and 1 number
+        if (!re.test(pwd)) return { valid: false, message: 'Password must be at least 8 characters and include letters and numbers.' };
+        return { valid: true };
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
+        const pwdValidation = validatePassword(password);
+        if (!pwdValidation.valid) {
+            setError(pwdValidation.message);
+            setLoading(false);
+            return;
+        }
 
         try {
             const response = await api.post('/Auth/login', { email, password });

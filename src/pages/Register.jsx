@@ -16,10 +16,40 @@ const Register = () => {
     const [showPassword, setShowPassword] = useState(false);
     const navigate = useNavigate();
 
+    const validatePassword = (pwd) => {
+        if (!pwd) return { valid: false, message: 'Password is required.' };
+        const re = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/; // min 8, at least one letter and one number
+        if (!re.test(pwd)) return { valid: false, message: 'Password must be at least 8 characters and include letters and numbers.' };
+        return { valid: true };
+    };
+
+    const validatePhone = (phone) => {
+        if (!phone) return { valid: true };
+        const digits = phone.replace(/\D/g, '');
+        if (!/^\d{10}$/.test(digits)) return { valid: false, message: 'Phone number must be exactly 10 digits.' };
+        return { valid: true };
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
+
+        // Validate phone
+        const phoneValidation = validatePhone(formData.phoneNumber);
+        if (!phoneValidation.valid) {
+            setError(phoneValidation.message);
+            setLoading(false);
+            return;
+        }
+
+        // Validate password
+        const pwdValidation = validatePassword(formData.password);
+        if (!pwdValidation.valid) {
+            setError(pwdValidation.message);
+            setLoading(false);
+            return;
+        }
 
         try {
             await api.post('/Auth/register', formData);
@@ -110,9 +140,14 @@ const Register = () => {
                                 type="tel"
                                 className="form-input"
                                 style={{ paddingLeft: '3rem' }}
-                                placeholder="+1 (555) 000-0000"
+                                placeholder="1234567890"
                                 value={formData.phoneNumber}
-                                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                                maxLength={10}
+                                pattern="\d{10}"
+                                onChange={(e) => {
+                                    const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                    setFormData({ ...formData, phoneNumber: raw });
+                                }}
                             />
                         </div>
                     </div>

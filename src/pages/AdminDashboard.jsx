@@ -56,6 +56,16 @@ const AdminDashboard = () => {
         fetchAdmins();
     }, []);
 
+    // Image validation settings
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+    const validateImage = (file) => {
+        if (!file) return { valid: true };
+        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return { valid: false, message: 'Only JPEG, PNG or WebP images are allowed.' };
+        if (file.size > MAX_IMAGE_SIZE) return { valid: false, message: 'Image must be smaller than 2MB.' };
+        return { valid: true };
+    };
+
     const fetchAdmins = async () => {
         try {
             const res = await api.get('/Users/admins');
@@ -100,6 +110,12 @@ const AdminDashboard = () => {
 
     const handleSaveProduct = async (e) => {
         e.preventDefault();
+        // Validate image file before building FormData
+        const imgValidation = validateImage(newProduct.imageFile);
+        if (!imgValidation.valid) {
+            alert(imgValidation.message);
+            return;
+        }
         const formData = new FormData();
         formData.append('ProductName', newProduct.productName);
         formData.append('Description', newProduct.description);
@@ -115,13 +131,9 @@ const AdminDashboard = () => {
 
         try {
             if (editingProduct) {
-                await api.put(`/Products/${editingProduct.productId}`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await api.put(`/Products/${editingProduct.productId}`, formData);
             } else {
-                await api.post('/Products', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await api.post('/Products', formData);
             }
             setShowProductModal(false);
             setEditingProduct(null);
@@ -730,8 +742,18 @@ const AdminDashboard = () => {
                                             <input
                                                 type="file"
                                                 className="form-input"
-                                                accept="image/*"
-                                                onChange={(e) => setNewProduct({ ...newProduct, imageFile: e.target.files[0] })}
+                                                accept="image/png, image/jpeg, image/webp"
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    const v = validateImage(file);
+                                                    if (!v.valid) {
+                                                        alert(v.message);
+                                                        e.target.value = null;
+                                                        setNewProduct({ ...newProduct, imageFile: null });
+                                                        return;
+                                                    }
+                                                    setNewProduct({ ...newProduct, imageFile: file });
+                                                }}
                                             />
                                             {newProduct.imageUrl && !newProduct.imageFile && (
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--secondary)' }}>Current image will be kept if no new file is chosen.</div>
