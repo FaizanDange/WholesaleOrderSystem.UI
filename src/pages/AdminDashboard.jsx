@@ -803,8 +803,8 @@ const AdminDashboard = () => {
 
                     {/* Create Admin Modal */}
                     {showAdminModal && (
-                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-                            <div className="glass-card" style={{ width: '100%', maxWidth: '400px', padding: '2rem', background: 'white' }}>
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', zIndex: 3000, overflowY: 'auto', padding: '1rem' }}>
+                            <div className="glass-card" style={{ width: '100%', maxWidth: '400px', padding: '2rem', background: 'white', maxHeight: 'calc(100vh - 2rem)', overflowY: 'auto' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                                     <ShieldCheck size={24} color="var(--primary)" />
                                     <h2 style={{ fontSize: '1.25rem' }}>Create Staff Admin</h2>
@@ -850,8 +850,8 @@ const AdminDashboard = () => {
 
                     {/* Add Product Modal */}
                     {showProductModal && (
-                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-                            <div className="glass-card" style={{ width: '100%', maxWidth: '500px', padding: '2rem', background: 'white' }}>
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', zIndex: 3000, overflowY: 'auto', padding: '1rem' }}>
+                            <div className="glass-card" style={{ width: '100%', maxWidth: '500px', padding: '2rem', background: 'white', maxHeight: 'calc(100vh - 2rem)', overflowY: 'auto' }}>
                                 <h2 style={{ marginBottom: '1.5rem' }}>{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
                                 <form onSubmit={handleSaveProduct}>
                                     <div className="form-group">
