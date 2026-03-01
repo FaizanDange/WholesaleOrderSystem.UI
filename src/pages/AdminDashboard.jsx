@@ -79,11 +79,13 @@ const AdminDashboard = () => {
     }, [totalCount, page, pageSize]);
 
     // Image validation settings
-    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg'];
     const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
     const validateImage = (file) => {
         if (!file) return { valid: true };
-        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return { valid: false, message: 'Only JPEG, PNG or WebP images are allowed.' };
+        const hasValidMime = ALLOWED_IMAGE_TYPES.includes(file.type);
+        const hasValidExt = /\.(jpe?g)$/i.test(file.name || '');
+        if (!hasValidMime && !hasValidExt) return { valid: false, message: 'Only JPG/JPEG images are allowed.' };
         if (file.size > MAX_IMAGE_SIZE) return { valid: false, message: 'Image must be smaller than 2MB.' };
         return { valid: true };
     };
@@ -888,7 +890,7 @@ const AdminDashboard = () => {
                                             <input
                                                 type="file"
                                                 className="form-input"
-                                                accept="image/png, image/jpeg, image/webp"
+                                                accept=".jpg,.jpeg,image/jpeg"
                                                 onChange={(e) => {
                                                     const file = e.target.files[0];
                                                     const v = validateImage(file);
@@ -901,6 +903,9 @@ const AdminDashboard = () => {
                                                     setNewProduct({ ...newProduct, imageFile: file });
                                                 }}
                                             />
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary)' }}>
+                                                Note: Only JPG/JPEG format is allowed, below 2MB.
+                                            </div>
                                             {newProduct.imageUrl && !newProduct.imageFile && (
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--secondary)' }}>Current image will be kept if no new file is chosen.</div>
                                             )}
