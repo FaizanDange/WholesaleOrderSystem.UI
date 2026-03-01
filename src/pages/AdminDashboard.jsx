@@ -30,6 +30,11 @@ import ChangePassword from './ChangePassword';
 
 const AdminDashboard = () => {
     const [products, setProducts] = useState([]);
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10);
+    const [totalCount, setTotalCount] = useState(0);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [orders, setOrders] = useState([]);
     const [showProductModal, setShowProductModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -42,7 +47,7 @@ const AdminDashboard = () => {
     const [newProduct, setNewProduct] = useState({ productName: '', description: '', price: '', stockQuantity: '', unit: 'pcs', imageUrl: '', imageFile: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [stockFilter, setStockFilter] = useState('all'); // 'all', 'instock', 'outofstock'
-    const [collapsedSections, setCollapsedSections] = useState({ pending: false, approved: false, delivered: false });
+    const [collapsedSections, setCollapsedSections] = useState({ pending: false, approved: false, delivered: false, rejected: false });
     const [admins, setAdmins] = useState([]);
     const [showAdminModal, setShowAdminModal] = useState(false);
     const [showAdminPassword, setShowAdminPassword] = useState(false);
@@ -50,11 +55,28 @@ const AdminDashboard = () => {
     const { user, logout } = useAuth();
 
     useEffect(() => {
-        fetchProducts();
         fetchOrders();
         fetchCustomers();
         fetchAdmins();
     }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm.trim());
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        fetchProducts();
+    }, [page, debouncedSearchTerm, stockFilter]);
+
+    useEffect(() => {
+        const maxPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        if (page > maxPages) {
+            setPage(maxPages);
+        }
+    }, [totalCount, page, pageSize]);
 
     // Image validation settings
     const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -89,10 +111,89 @@ const AdminDashboard = () => {
     };
 
     const fetchProducts = async () => {
+        setLoadingProducts(true);
         try {
-            const res = await api.get('/Products');
-            setProducts(res.data);
-        } catch (err) { console.error(err); }
+            const parseProductsResponse = (res) => {
+                if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+                    const items = Array.isArray(res.data.items) ? res.data.items : [];
+                    const serverTotal = Number(res.data.totalCount);
+                    return {
+                        items,
+                        totalCount: Number.isFinite(serverTotal) ? serverTotal : items.length,
+                    };
+                }
+                if (Array.isArray(res.data)) {
+                    const headerTotal = Number(res.headers?.['x-total-count']);
+                    return {
+                        items: res.data,
+                        totalCount: Number.isFinite(headerTotal) ? headerTotal : res.data.length,
+                    };
+                }
+                return { items: [], totalCount: 0 };
+            };
+
+            const query = debouncedSearchTerm.toLowerCase();
+            const applyClientFilters = (items) =>
+                items.filter((p) => {
+                    const name = (p.productName || '').toLowerCase();
+                    const description = (p.description || '').toLowerCase();
+                    const matchesSearch = !query || name.includes(query) || description.includes(query);
+                    const matchesStock = stockFilter === 'all' ||
+                        (stockFilter === 'instock' && p.stockQuantity > 0) ||
+                        (stockFilter === 'outofstock' && p.stockQuantity === 0);
+                    return matchesSearch && matchesStock;
+                });
+
+            // Fallback path: if searching/filtering, collect full product set, then filter + paginate on client.
+            // This guarantees search works even if backend does not implement search param.
+            if (debouncedSearchTerm || stockFilter !== 'all') {
+                const requestPageSize = 100;
+                const firstRes = await api.get('/Products', { params: { page: 1, pageSize: requestPageSize } });
+                const firstParsed = parseProductsResponse(firstRes);
+                let allProducts = [...firstParsed.items];
+                const expectedTotal = firstParsed.totalCount;
+                const seenIds = new Set(allProducts.map((p) => p.productId));
+                let currentPage = 2;
+
+                while (allProducts.length < expectedTotal) {
+                    const nextRes = await api.get('/Products', { params: { page: currentPage, pageSize: requestPageSize } });
+                    const nextParsed = parseProductsResponse(nextRes);
+                    if (!nextParsed.items.length) break;
+
+                    let added = 0;
+                    nextParsed.items.forEach((item) => {
+                        if (!seenIds.has(item.productId)) {
+                            seenIds.add(item.productId);
+                            allProducts.push(item);
+                            added += 1;
+                        }
+                    });
+                    if (added === 0) break;
+                    currentPage += 1;
+                }
+
+                const filtered = applyClientFilters(allProducts);
+                const start = (page - 1) * pageSize;
+                setTotalCount(filtered.length);
+                setProducts(filtered.slice(start, start + pageSize));
+                return;
+            }
+
+            const params = {
+                page,
+                pageSize,
+            };
+            const res = await api.get('/Products', { params });
+            const parsed = parseProductsResponse(res);
+            setProducts(parsed.items);
+            setTotalCount(parsed.totalCount);
+        } catch (err) {
+            console.error(err);
+            setProducts([]);
+            setTotalCount(0);
+        } finally {
+            setLoadingProducts(false);
+        }
     };
 
     const fetchOrders = async () => {
@@ -301,7 +402,7 @@ const AdminDashboard = () => {
                             <div style={{ padding: '0.75rem', borderRadius: '12px', background: '#dbeafe', color: '#1e40af' }}><Package size={24} /></div>
                             <div>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--secondary)' }}>Total Products</div>
-                                <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>{products.length}</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>{totalCount}</div>
                             </div>
                         </div>
                         <div className="glass-card stat-card">
@@ -416,14 +517,20 @@ const AdminDashboard = () => {
                                             className="form-input"
                                             style={{ paddingLeft: '2.5rem' }}
                                             value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            onChange={(e) => {
+                                                setSearchTerm(e.target.value);
+                                                setPage(1);
+                                            }}
                                         />
                                     </div>
                                     <select
                                         className="form-input"
                                         style={{ width: '150px' }}
                                         value={stockFilter}
-                                        onChange={(e) => setStockFilter(e.target.value)}
+                                        onChange={(e) => {
+                                            setStockFilter(e.target.value);
+                                            setPage(1);
+                                        }}
                                     >
                                         <option value="all">All Products</option>
                                         <option value="instock">In Stock</option>
@@ -433,15 +540,7 @@ const AdminDashboard = () => {
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                                {products
-                                    .filter(p => {
-                                        const matchesSearch = p.productName.toLowerCase().includes(searchTerm.toLowerCase());
-                                        const matchesFilter = stockFilter === 'all' ||
-                                            (stockFilter === 'instock' && p.stockQuantity > 0) ||
-                                            (stockFilter === 'outofstock' && p.stockQuantity === 0);
-                                        return matchesSearch && matchesFilter;
-                                    })
-                                    .map(product => (
+                                {(Array.isArray(products) ? products : []).map(product => (
                                         <div key={product.productId} className="glass-card" style={{ padding: '0', overflow: 'hidden', border: '1px solid #e2e8f0', background: 'white', display: 'flex', flexDirection: 'column' }}>
                                             <div style={{ position: 'relative', height: '160px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 {product.imageUrl ? (
@@ -473,6 +572,34 @@ const AdminDashboard = () => {
                                             </div>
                                         </div>
                                     ))}
+                            </div>
+
+                            {!loadingProducts && products.length === 0 && (
+                                <div style={{ marginTop: '1.5rem', textAlign: 'center', color: 'var(--secondary)', fontStyle: 'italic' }}>
+                                    No products found for your search/filter.
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginTop: '1.25rem' }}>
+                                <button
+                                    className="btn"
+                                    onClick={() => setPage(Math.max(1, page - 1))}
+                                    disabled={page <= 1 || loadingProducts}
+                                    style={{ padding: '0.5rem 0.75rem' }}
+                                >
+                                    Prev
+                                </button>
+                                <div style={{ fontWeight: '700' }}>
+                                    Page {page} of {Math.max(1, Math.ceil(totalCount / pageSize))}
+                                </div>
+                                <button
+                                    className="btn"
+                                    onClick={() => setPage(Math.min(Math.max(1, Math.ceil(totalCount / pageSize)), page + 1))}
+                                    disabled={loadingProducts || page >= Math.max(1, Math.ceil(totalCount / pageSize))}
+                                    style={{ padding: '0.5rem 0.75rem' }}
+                                >
+                                    Next
+                                </button>
                             </div>
                         </section>
                     )}
@@ -601,6 +728,25 @@ const AdminDashboard = () => {
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                                         {customerOrders.filter(o => o.status === 'Delivered').map(order => renderOrderCard(order))}
                                                         {customerOrders.filter(o => o.status === 'Delivered').length === 0 && <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>No delivered orders.</p>}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Rejected Section */}
+                                            <div>
+                                                <div
+                                                    onClick={() => setCollapsedSections(prev => ({ ...prev, rejected: !prev.rejected }))}
+                                                    style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}
+                                                >
+                                                    <h4 style={{ fontSize: '0.9rem', color: '#ef4444', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <Trash2 size={16} /> Rejected Orders ({customerOrders.filter(o => o.status === 'Rejected').length})
+                                                    </h4>
+                                                    {collapsedSections.rejected ? <ChevronDown size={18} color="#ef4444" /> : <ChevronUp size={18} color="#ef4444" />}
+                                                </div>
+                                                {!collapsedSections.rejected && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                                        {customerOrders.filter(o => o.status === 'Rejected').map(order => renderOrderCard(order))}
+                                                        {customerOrders.filter(o => o.status === 'Rejected').length === 0 && <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>No rejected orders.</p>}
                                                     </div>
                                                 )}
                                             </div>

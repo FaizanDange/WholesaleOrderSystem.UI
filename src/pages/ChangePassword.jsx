@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Lock, ShieldCheck, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const ChangePassword = () => {
     const { logout } = useAuth();
@@ -43,17 +44,16 @@ const ChangePassword = () => {
             });
 
             setStatus({ type: 'success', message: 'Password updated! Redirecting to login...' });
-
+            toast.success('Password updated — you will be logged out');
             // Wait 2 seconds so user can see the success message, then force logout to re-login
             setTimeout(() => {
                 logout();
             }, 2000);
 
         } catch (err) {
-            setStatus({
-                type: 'error',
-                message: err.response?.data?.message || 'Failed to update password'
-            });
+            const msg = err.response?.data?.message || 'Failed to update password';
+            setStatus({ type: 'error', message: msg });
+            toast.error(msg);
             setLoading(false);
         }
     };

@@ -1,10 +1,11 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { toast } from 'react-toastify';
 
 export const downloadOrderPDF = (order, userName = 'Valued Customer') => {
     if (!order || !order.items) {
         console.error("No items found to download");
-        alert("Cannot download: Order details are missing items.");
+        toast.error("Cannot download: Order details are missing items.");
         return;
     }
 
@@ -70,6 +71,6 @@ export const downloadOrderPDF = (order, userName = 'Valued Customer') => {
         doc.save(`Items_List_${safeName}.pdf`);
     } catch (err) {
         console.error("PDF Generation Error:", err);
-        alert("Error generating PDF. Please check console for details.");
+        toast.error("Error generating PDF. Please check console for details.");
     }
 };

@@ -20,27 +20,114 @@ import {
 } from 'lucide-react';
 import { downloadOrderPDF } from '../utils/pdfGenerator';
 import ChangePassword from './ChangePassword';
+import { toast } from 'react-toastify';
 
 const RetailerDashboard = () => {
     const [products, setProducts] = useState([]);
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10);
+    const [totalCount, setTotalCount] = useState(0);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [orders, setOrders] = useState([]);
     const [cart, setCart] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [view, setView] = useState('shop'); // 'shop' or 'history'
     const [expandedOrderId, setExpandedOrderId] = useState(null);
-    const [collapsedSections, setCollapsedSections] = useState({ pending: false, approved: false, delivered: false });
+    const [collapsedSections, setCollapsedSections] = useState({ pending: false, approved: false, delivered: false, rejected: false });
     const { user, logout } = useAuth();
 
     useEffect(() => {
-        fetchProducts();
         fetchMyOrders();
     }, []);
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm.trim());
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        fetchProducts();
+    }, [page, debouncedSearchTerm]);
+
+    useEffect(() => {
+        const maxPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        if (page > maxPages) {
+            setPage(maxPages);
+        }
+    }, [totalCount, page, pageSize]);
+
     const fetchProducts = async () => {
+        setLoadingProducts(true);
         try {
-            const res = await api.get('/Products');
-            setProducts(res.data);
+            const parseProductsResponse = (res) => {
+                if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+                    const items = Array.isArray(res.data.items) ? res.data.items : [];
+                    const serverTotal = Number(res.data.totalCount);
+                    return {
+                        items,
+                        totalCount: Number.isFinite(serverTotal) ? serverTotal : items.length,
+                    };
+                }
+                if (Array.isArray(res.data)) {
+                    const headerTotal = Number(res.headers?.['x-total-count']);
+                    return {
+                        items: res.data,
+                        totalCount: Number.isFinite(headerTotal) ? headerTotal : res.data.length,
+                    };
+                }
+                return { items: [], totalCount: 0 };
+            };
+
+            const query = debouncedSearchTerm.toLowerCase();
+
+            // Global search fallback: collect full dataset when searching,
+            // then filter client-side and paginate 10 per page.
+            if (debouncedSearchTerm) {
+                const requestPageSize = 100;
+                const firstRes = await api.get('/Products', { params: { page: 1, pageSize: requestPageSize } });
+                const firstParsed = parseProductsResponse(firstRes);
+                let allProducts = [...firstParsed.items];
+                const expectedTotal = firstParsed.totalCount;
+                const seenIds = new Set(allProducts.map((p) => p.productId));
+                let currentPage = 2;
+
+                while (allProducts.length < expectedTotal) {
+                    const nextRes = await api.get('/Products', { params: { page: currentPage, pageSize: requestPageSize } });
+                    const nextParsed = parseProductsResponse(nextRes);
+                    if (!nextParsed.items.length) break;
+
+                    let added = 0;
+                    nextParsed.items.forEach((item) => {
+                        if (!seenIds.has(item.productId)) {
+                            seenIds.add(item.productId);
+                            allProducts.push(item);
+                            added += 1;
+                        }
+                    });
+                    if (added === 0) break;
+                    currentPage += 1;
+                }
+
+                const filtered = allProducts.filter((p) =>
+                    (p.productName || '').toLowerCase().includes(query) ||
+                    (p.description || '').toLowerCase().includes(query)
+                );
+
+                const start = (page - 1) * pageSize;
+                setTotalCount(filtered.length);
+                setProducts(filtered.slice(start, start + pageSize));
+                return;
+            }
+
+            const res = await api.get('/Products', { params: { page, pageSize } });
+            const parsed = parseProductsResponse(res);
+            setProducts(parsed.items);
+            setTotalCount(parsed.totalCount);
         } catch (err) { console.error(err); }
+        finally { setLoadingProducts(false); }
     };
 
     const fetchMyOrders = async () => {
@@ -83,16 +170,13 @@ const RetailerDashboard = () => {
             setCart([]);
             setView('history');
             fetchMyOrders();
-            alert("Order sent to Wholesaler successfully!");
+            toast.success("Order sent to Wholesaler successfully!");
         } catch (err) {
-            alert(err.response?.data || "Failed to place order.");
+            toast.error(err.response?.data || "Failed to place order.");
         }
     };
 
-    const filteredProducts = products.filter(p =>
-        p.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProducts = Array.isArray(products) ? products : [];
 
     const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
@@ -224,7 +308,10 @@ const RetailerDashboard = () => {
                                             style={{ paddingLeft: '3rem' }}
                                             placeholder="Search medical supplies..."
                                             value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            onChange={(e) => {
+                                                setSearchTerm(e.target.value);
+                                                setPage(1);
+                                            }}
                                         />
                                     </div>
                                 </header>
@@ -259,6 +346,34 @@ const RetailerDashboard = () => {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+
+                                {!loadingProducts && filteredProducts.length === 0 && (
+                                    <div style={{ marginTop: '1.5rem', textAlign: 'center', color: 'var(--secondary)', fontStyle: 'italic' }}>
+                                        No products found for your search.
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginTop: '1.25rem' }}>
+                                    <button
+                                        className="btn"
+                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                        disabled={page <= 1 || loadingProducts}
+                                        style={{ padding: '0.5rem 0.75rem' }}
+                                    >
+                                        Prev
+                                    </button>
+                                    <div style={{ fontWeight: '700' }}>
+                                        Page {page} of {Math.max(1, Math.ceil(totalCount / pageSize))}
+                                    </div>
+                                    <button
+                                        className="btn"
+                                        onClick={() => setPage(Math.min(Math.max(1, Math.ceil(totalCount / pageSize)), page + 1))}
+                                        disabled={loadingProducts || page >= Math.max(1, Math.ceil(totalCount / pageSize))}
+                                        style={{ padding: '0.5rem 0.75rem' }}
+                                    >
+                                        Next
+                                    </button>
                                 </div>
                             </>
                         ) : view === 'cart' ? (
@@ -338,6 +453,27 @@ const RetailerDashboard = () => {
                                                     <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} user={user} />
                                                 ))}
                                                 {orders.filter(o => o.status === 'Delivered').length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontStyle: 'italic', paddingLeft: '1rem' }}>No delivered orders.</div>}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Rejected Orders Section */}
+                                    <div>
+                                        <div
+                                            onClick={() => setCollapsedSections(prev => ({ ...prev, rejected: !prev.rejected }))}
+                                            style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}
+                                        >
+                                            <h4 style={{ fontSize: '0.9rem', color: '#ef4444', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <Trash2 size={16} /> Rejected Orders ({orders.filter(o => o.status === 'Rejected').length})
+                                            </h4>
+                                            {collapsedSections.rejected ? <ChevronDown size={18} color="#ef4444" /> : <ChevronUp size={18} color="#ef4444" />}
+                                        </div>
+                                        {!collapsedSections.rejected && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                                {orders.filter(o => o.status === 'Rejected').map(order => (
+                                                    <OrderHistoryCard key={order.orderId} order={order} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} user={user} />
+                                                ))}
+                                                {orders.filter(o => o.status === 'Rejected').length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--secondary)', fontStyle: 'italic', paddingLeft: '1rem' }}>No rejected orders.</div>}
                                             </div>
                                         )}
                                     </div>

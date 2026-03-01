@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ const Login = () => {
         setLoading(true);
         const pwdValidation = validatePassword(password);
         if (!pwdValidation.valid) {
-            setError(pwdValidation.message);
+            toast.error(pwdValidation.message);
             setLoading(false);
             return;
         }
@@ -33,6 +34,7 @@ const Login = () => {
         try {
             const response = await api.post('/Auth/login', { email, password });
             login(response.data, response.data.token);
+            toast.success('Signed in successfully');
         } catch (err) {
             setError(err.response?.data?.message || 'Invalid email or password');
         } finally {

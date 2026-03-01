@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff, AlertCircle, Phone, MapPin } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const Register = () => {
     const [formData, setFormData] = useState({
@@ -38,7 +39,7 @@ const Register = () => {
         // Validate phone
         const phoneValidation = validatePhone(formData.phoneNumber);
         if (!phoneValidation.valid) {
-            setError(phoneValidation.message);
+            toast.error(phoneValidation.message);
             setLoading(false);
             return;
         }
@@ -46,16 +47,17 @@ const Register = () => {
         // Validate password
         const pwdValidation = validatePassword(formData.password);
         if (!pwdValidation.valid) {
-            setError(pwdValidation.message);
+            toast.error(pwdValidation.message);
             setLoading(false);
             return;
         }
 
         try {
             await api.post('/Auth/register', formData);
+            toast.success('Account created — please login');
             navigate('/login');
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed');
+            toast.error(err.response?.data?.message || 'Registration failed');
         } finally {
             setLoading(false);
         }
