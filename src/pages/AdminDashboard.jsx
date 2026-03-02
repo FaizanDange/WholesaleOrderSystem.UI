@@ -29,6 +29,20 @@ import { downloadOrderPDF } from '../utils/pdfGenerator';
 import ChangePassword from './ChangePassword';
 
 const AdminDashboard = () => {
+    const MAX_DESCRIPTION_WORDS = 25;
+    const countWords = (text = '') => (text.trim().match(/\S+/g) || []).length;
+
+    const normalizeProduct = (p) => ({
+        ...p,
+        productId: p?.productId ?? p?.ProductId,
+        productName: p?.productName ?? p?.ProductName ?? '',
+        description: p?.description ?? p?.Description ?? p?.decription ?? p?.Decription ?? '',
+        price: p?.price ?? p?.Price ?? 0,
+        stockQuantity: p?.stockQuantity ?? p?.StockQuantity ?? 0,
+        imageUrl: p?.imageUrl ?? p?.ImageUrl ?? '',
+        unit: p?.unit ?? p?.Unit ?? 'pcs',
+    });
+
     const [products, setProducts] = useState([]);
     const [page, setPage] = useState(1);
     const [pageSize] = useState(10);
@@ -44,7 +58,7 @@ const AdminDashboard = () => {
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerOrders, setCustomerOrders] = useState([]);
-    const [newProduct, setNewProduct] = useState({ productName: '', description: '', price: '', stockQuantity: '', unit: 'pcs', imageUrl: '', imageFile: null });
+    const [newProduct, setNewProduct] = useState({ productName: '', description: '', price: '', stockQuantity: '', unit: '', imageUrl: '', imageFile: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [stockFilter, setStockFilter] = useState('all'); // 'all', 'instock', 'outofstock'
     const [collapsedSections, setCollapsedSections] = useState({ pending: false, approved: false, delivered: false, rejected: false });
@@ -53,6 +67,10 @@ const AdminDashboard = () => {
     const [showAdminPassword, setShowAdminPassword] = useState(false);
     const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '' });
     const { user, logout } = useAuth();
+    const descriptionWordCount = countWords(newProduct.description);
+    const isDescriptionTooLong = descriptionWordCount > MAX_DESCRIPTION_WORDS;
+    const cleanedUnit = typeof newProduct.unit === 'string' ? newProduct.unit.trim() : '';
+    const isUnitMissing = !cleanedUnit;
 
     useEffect(() => {
         fetchOrders();
@@ -117,7 +135,7 @@ const AdminDashboard = () => {
         try {
             const parseProductsResponse = (res) => {
                 if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
-                    const items = Array.isArray(res.data.items) ? res.data.items : [];
+                    const items = Array.isArray(res.data.items) ? res.data.items.map(normalizeProduct) : [];
                     const serverTotal = Number(res.data.totalCount);
                     return {
                         items,
@@ -127,7 +145,7 @@ const AdminDashboard = () => {
                 if (Array.isArray(res.data)) {
                     const headerTotal = Number(res.headers?.['x-total-count']);
                     return {
-                        items: res.data,
+                        items: res.data.map(normalizeProduct),
                         totalCount: Number.isFinite(headerTotal) ? headerTotal : res.data.length,
                     };
                 }
@@ -213,6 +231,17 @@ const AdminDashboard = () => {
 
     const handleSaveProduct = async (e) => {
         e.preventDefault();
+        if (isUnitMissing) {
+            alert('Please choose a measurement unit.');
+            return;
+        }
+        if (isDescriptionTooLong) {
+            alert(`Description can have maximum ${MAX_DESCRIPTION_WORDS} words.`);
+            return;
+        }
+
+        const cleanedDescription = (newProduct.description || '').trim().replace(/\s+/g, ' ');
+
         // Validate image file before building FormData
         const imgValidation = validateImage(newProduct.imageFile);
         if (!imgValidation.valid) {
@@ -221,10 +250,10 @@ const AdminDashboard = () => {
         }
         const formData = new FormData();
         formData.append('ProductName', newProduct.productName);
-        formData.append('Description', newProduct.description);
+        formData.append('Description', cleanedDescription);
         formData.append('Price', newProduct.price);
         formData.append('StockQuantity', newProduct.stockQuantity);
-        formData.append('Unit', newProduct.unit);
+        formData.append('Unit', cleanedUnit);
 
         if (newProduct.imageFile) {
             formData.append('image', newProduct.imageFile);
@@ -240,7 +269,7 @@ const AdminDashboard = () => {
             }
             setShowProductModal(false);
             setEditingProduct(null);
-            setNewProduct({ productName: '', description: '', price: '', stockQuantity: '', unit: 'pcs', imageUrl: '', imageFile: null });
+            setNewProduct({ productName: '', description: '', price: '', stockQuantity: '', unit: '', imageUrl: '', imageFile: null });
             fetchProducts();
         } catch (err) { alert("Failed to save product"); }
     };
@@ -252,7 +281,7 @@ const AdminDashboard = () => {
             description: product.description,
             price: product.price,
             stockQuantity: product.stockQuantity,
-            unit: product.unit || 'pcs',
+            unit: product.unit || '',
             imageUrl: product.imageUrl || '',
             imageFile: null
         });
@@ -261,7 +290,7 @@ const AdminDashboard = () => {
 
     const openAddModal = () => {
         setEditingProduct(null);
-        setNewProduct({ productName: '', description: '', price: '', stockQuantity: '', imageUrl: '', imageFile: null });
+        setNewProduct({ productName: '', description: '', price: '', stockQuantity: '', unit: '', imageUrl: '', imageFile: null });
         setShowProductModal(true);
     };
 
@@ -560,7 +589,22 @@ const AdminDashboard = () => {
                                             </div>
                                             <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                                                 <h3 style={{ fontWeight: '700', marginBottom: '0.5rem' }}>{product.productName}</h3>
-                                                <p style={{ color: 'var(--secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', flex: 1 }}>{product.description}</p>
+                                                <p
+                                                    style={{
+                                                        color: 'var(--secondary)',
+                                                        fontSize: '0.85rem',
+                                                        marginBottom: '1.25rem',
+                                                        lineHeight: '1.35',
+                                                        minHeight: '2.7em',
+                                                        overflow: 'hidden',
+                                                        display: '-webkit-box',
+                                                        WebkitBoxOrient: 'vertical',
+                                                        WebkitLineClamp: 2
+                                                    }}
+                                                    title={product.description || ''}
+                                                >
+                                                    {product.description}
+                                                </p>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
                                                     <div>
                                                         <div style={{ fontSize: '0.7rem', color: 'var(--secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Price</div>
@@ -568,7 +612,7 @@ const AdminDashboard = () => {
                                                     </div>
                                                     <div style={{ textAlign: 'right' }}>
                                                         <div style={{ fontSize: '0.7rem', color: 'var(--secondary)', textTransform: 'uppercase', fontWeight: '700' }}>Quantity</div>
-                                                        <div style={{ fontWeight: '600', color: product.stockQuantity === 0 ? 'var(--danger)' : 'inherit' }}>{product.stockQuantity} {product.unit}</div>
+                                                        <div style={{ fontWeight: '600', color: product.stockQuantity === 0 ? 'var(--danger)' : 'inherit' }}>{product.stockQuantity} {product.unit || 'pcs'}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -860,7 +904,15 @@ const AdminDashboard = () => {
                                     </div>
                                     <div className="form-group">
                                         <label>Description</label>
-                                        <textarea className="form-input" style={{ minHeight: '80px' }} value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} />
+                                        <textarea
+                                            className="form-input"
+                                            style={{ minHeight: '80px' }}
+                                            value={newProduct.description}
+                                            onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                                        />
+                                        <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: isDescriptionTooLong ? 'var(--danger)' : 'var(--secondary)' }}>
+                                            {descriptionWordCount}/{MAX_DESCRIPTION_WORDS} words
+                                        </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '1rem' }}>
                                         <div className="form-group" style={{ flex: 1 }}>
@@ -874,7 +926,8 @@ const AdminDashboard = () => {
                                     </div>
                                     <div className="form-group">
                                         <label>Measurement Unit</label>
-                                        <select className="form-input" value={newProduct.unit} onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}>
+                                        <select className="form-input" required value={newProduct.unit} onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}>
+                                            <option value="" disabled>Select unit</option>
                                             <option value="pcs">Pieces (pcs)</option>
                                             <option value="kg">Kilograms (kg)</option>
                                             <option value="liter">Liters (liter)</option>
@@ -883,6 +936,11 @@ const AdminDashboard = () => {
                                             <option value="box">Boxes (box)</option>
                                             <option value="dozen">Dozen</option>
                                         </select>
+                                        {isUnitMissing && (
+                                            <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--danger)' }}>
+                                                Unit is required.
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Product Image</label>
@@ -913,7 +971,7 @@ const AdminDashboard = () => {
                                     </div>
                                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                                         <button type="button" className="btn" style={{ flex: 1, background: '#e2e8f0' }} onClick={() => setShowProductModal(false)}>Cancel</button>
-                                        <button type="submit" className="btn btn-primary" style={{ flex: 2 }}>Save Product</button>
+                                        <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={isDescriptionTooLong || isUnitMissing}>Save Product</button>
                                     </div>
                                 </form>
                             </div>

@@ -23,6 +23,17 @@ import ChangePassword from './ChangePassword';
 import { toast } from 'react-toastify';
 
 const RetailerDashboard = () => {
+    const normalizeProduct = (p) => ({
+        ...p,
+        productId: p?.productId ?? p?.ProductId,
+        productName: p?.productName ?? p?.ProductName ?? '',
+        description: p?.description ?? p?.Description ?? p?.decription ?? p?.Decription ?? '',
+        price: p?.price ?? p?.Price ?? 0,
+        stockQuantity: p?.stockQuantity ?? p?.StockQuantity ?? 0,
+        imageUrl: p?.imageUrl ?? p?.ImageUrl ?? '',
+        unit: p?.unit ?? p?.Unit ?? 'pcs',
+    });
+
     const [products, setProducts] = useState([]);
     const [page, setPage] = useState(1);
     const [pageSize] = useState(10);
@@ -64,7 +75,7 @@ const RetailerDashboard = () => {
         try {
             const parseProductsResponse = (res) => {
                 if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
-                    const items = Array.isArray(res.data.items) ? res.data.items : [];
+                    const items = Array.isArray(res.data.items) ? res.data.items.map(normalizeProduct) : [];
                     const serverTotal = Number(res.data.totalCount);
                     return {
                         items,
@@ -74,7 +85,7 @@ const RetailerDashboard = () => {
                 if (Array.isArray(res.data)) {
                     const headerTotal = Number(res.headers?.['x-total-count']);
                     return {
-                        items: res.data,
+                        items: res.data.map(normalizeProduct),
                         totalCount: Number.isFinite(headerTotal) ? headerTotal : res.data.length,
                     };
                 }
@@ -328,7 +339,22 @@ const RetailerDashboard = () => {
                                             </div>
                                             <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                                                 <h3 style={{ fontWeight: '700', marginBottom: '0.5rem' }}>{product.productName}</h3>
-                                                <p style={{ color: 'var(--secondary)', fontSize: '0.85rem', marginBottom: '1.5rem', flex: 1 }}>{product.description}</p>
+                                                <p
+                                                    style={{
+                                                        color: 'var(--secondary)',
+                                                        fontSize: '0.85rem',
+                                                        marginBottom: '1.5rem',
+                                                        lineHeight: '1.35',
+                                                        minHeight: '2.7em',
+                                                        overflow: 'hidden',
+                                                        display: '-webkit-box',
+                                                        WebkitBoxOrient: 'vertical',
+                                                        WebkitLineClamp: 2
+                                                    }}
+                                                    title={product.description || ''}
+                                                >
+                                                    {product.description}
+                                                </p>
                                                 <div style={{ marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--secondary)' }}>
                                                     <strong>Unit:</strong> {product.unit}
                                                 </div>
