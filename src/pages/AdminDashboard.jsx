@@ -30,6 +30,7 @@ import ChangePassword from './ChangePassword';
 
 const AdminDashboard = () => {
     const MAX_DESCRIPTION_WORDS = 25;
+    const RETAILERS_PAGE_SIZE = 5;
     const countWords = (text = '') => (text.trim().match(/\S+/g) || []).length;
 
     const normalizeProduct = (p) => ({
@@ -58,6 +59,8 @@ const AdminDashboard = () => {
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerOrders, setCustomerOrders] = useState([]);
+    const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+    const [customerPage, setCustomerPage] = useState(1);
     const [newProduct, setNewProduct] = useState({ productName: '', description: '', price: '', stockQuantity: '', unit: '', imageUrl: '', imageFile: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [stockFilter, setStockFilter] = useState('all'); // 'all', 'instock', 'outofstock'
@@ -71,6 +74,16 @@ const AdminDashboard = () => {
     const isDescriptionTooLong = descriptionWordCount > MAX_DESCRIPTION_WORDS;
     const cleanedUnit = typeof newProduct.unit === 'string' ? newProduct.unit.trim() : '';
     const isUnitMissing = !cleanedUnit;
+    const normalizedCustomerQuery = customerSearchTerm.trim().toLowerCase();
+    const filteredCustomers = customers.filter((customer) => {
+        const name = (customer.name || '').toLowerCase();
+        const email = (customer.email || '').toLowerCase();
+        return !normalizedCustomerQuery || name.includes(normalizedCustomerQuery) || email.includes(normalizedCustomerQuery);
+    });
+    const customerTotalCount = filteredCustomers.length;
+    const customerMaxPages = Math.max(1, Math.ceil(customerTotalCount / RETAILERS_PAGE_SIZE));
+    const customerStart = (customerPage - 1) * RETAILERS_PAGE_SIZE;
+    const visibleCustomers = filteredCustomers.slice(customerStart, customerStart + RETAILERS_PAGE_SIZE);
 
     useEffect(() => {
         fetchOrders();
@@ -95,6 +108,12 @@ const AdminDashboard = () => {
             setPage(maxPages);
         }
     }, [totalCount, page, pageSize]);
+
+    useEffect(() => {
+        if (customerPage > customerMaxPages) {
+            setCustomerPage(customerMaxPages);
+        }
+    }, [customerPage, customerMaxPages]);
 
     // Image validation settings
     const ALLOWED_IMAGE_TYPES = ['image/jpeg'];
@@ -655,9 +674,23 @@ const AdminDashboard = () => {
                         <section id="customers" className="responsive-flex-gap">
                             {/* Customer List */}
                             <div className="glass-card" style={{ flex: '1', minWidth: '300px', padding: '1.5rem', height: 'fit-content' }}>
-                                <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Our Retailers</h2>
+                                <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem' }}>Our Retailers</h2>
+                                <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                                    <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search retailers..."
+                                        className="form-input"
+                                        style={{ paddingLeft: '2.5rem' }}
+                                        value={customerSearchTerm}
+                                        onChange={(e) => {
+                                            setCustomerSearchTerm(e.target.value);
+                                            setCustomerPage(1);
+                                        }}
+                                    />
+                                </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    {customers.map(customer => (
+                                    {visibleCustomers.map(customer => (
                                         <div
                                             key={customer.userId}
                                             className="glass-card"
@@ -682,6 +715,32 @@ const AdminDashboard = () => {
                                             </div>
                                         </div>
                                     ))}
+                                    {visibleCustomers.length === 0 && (
+                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: '0.25rem' }}>
+                                            No retailers found for your search.
+                                        </p>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginTop: '1rem' }}>
+                                    <button
+                                        className="btn"
+                                        onClick={() => setCustomerPage(Math.max(1, customerPage - 1))}
+                                        disabled={customerPage <= 1}
+                                        style={{ padding: '0.45rem 0.7rem' }}
+                                    >
+                                        Prev
+                                    </button>
+                                    <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>
+                                        Page {customerPage} of {customerMaxPages}
+                                    </div>
+                                    <button
+                                        className="btn"
+                                        onClick={() => setCustomerPage(Math.min(customerMaxPages, customerPage + 1))}
+                                        disabled={customerPage >= customerMaxPages}
+                                        style={{ padding: '0.45rem 0.7rem' }}
+                                    >
+                                        Next
+                                    </button>
                                 </div>
                             </div>
 
